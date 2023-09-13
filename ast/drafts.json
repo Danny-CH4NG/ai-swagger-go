@@ -1,0 +1,53 @@
+{
+  "CreateAccount": {
+    "URL": "\"\"",
+    "Method": "POST",
+    "Params": null,
+    "Responses": [
+      "Status code: 400, Response: {\"error\": \"BindJSON error\"}\n",
+      "Status code: 401, Response: {\"error\": \"create account error\"}\n",
+      "Status code: 200, Response: {\"data\": account}\n"
+    ]
+  },
+  "DeleteAccount": {
+    "URL": "\"/:username\"",
+    "Method": "DELETE",
+    "Params": null,
+    "Responses": [
+      "Status code: 400, Response: {\"error\": \"BindJSON error\"}\n",
+      "Status code: 401, Response: {\"error\": \"delete account error\"}\n",
+      "Status code: 200, Response: {\"data\": account}\n"
+    ]
+  },
+  "GetAccountByUsername": {
+    "URL": "\"/:username\"",
+    "Method": "GET",
+    "Params": [
+      "\"username\""
+    ],
+    "Responses": [
+      "Status code: 404, Response: {\"error\": \"account not found\"}\n",
+      "Status code: 400, Response: {\"error\": \"get account error\"}\n",
+      "Status code: 200, Response: {\"data\": account}\n"
+    ]
+  },
+  "GetAccounts": {
+    "URL": "\"\"",
+    "Method": "GET",
+    "Params": null,
+    "Responses": [
+      "Status code: 400, Response: {\"error\": \"get accounts error\"}\n",
+      "Status code: 200, Response: {\"data\": accounts}\n"
+    ]
+  },
+  "UpdateAccount": {
+    "URL": "\"/:username\"",
+    "Method": "PUT",
+    "Params": null,
+    "Responses": [
+      "Status code: 400, Response: {\"error\": \"BindJSON error\"}\n",
+      "Status code: 401, Response: {\"error\": \"update account error\"}\n",
+      "Status code: 200, Response: {\"data\": account}\n"
+    ]
+  }
+}

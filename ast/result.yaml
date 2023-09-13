@@ -1,0 +1,11 @@
+url: '"/:username"'
+method: GET
+params:
+    - '"username"'
+responses:
+    - |
+      Status code: 404, Response: {"error": "account not found"}
+    - |
+      Status code: 400, Response: {"error": "get account error"}
+    - |
+      Status code: 200, Response: {"data": account}

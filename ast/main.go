@@ -1,70 +1,122 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-)
 
-type APIInfo struct {
-	Method    string
-	URL       string
-	Params    []string
-	Responses []string
-}
+	"astswagger/models"
+
+	"gopkg.in/yaml.v3"
+)
 
 var (
-	infoMap = make(map[string]*APIInfo)
+	apiMap = make(map[string]*models.Draft)
 )
 
-func processFuncDecl(funcDecl *ast.FuncDecl, apiInfo *APIInfo, outFile *os.File) {
-	// Traverse the function body
-	for _, stmt := range funcDecl.Body.List {
-		// Look for expression statements (like function calls)
-		exprStmt, ok := stmt.(*ast.ExprStmt)
-		if !ok {
-			continue
-		}
+// func extractResponseInfo(compLit *ast.CompositeLit) map[string]interface{} {
+// 	responseInfo := make(map[string]interface{})
+// 	for _, elt := range compLit.Elts {
+// 		// 斷言該元素為KeyValue表達式
+// 		kvExpr, ok := elt.(*ast.KeyValueExpr)
+// 		if ok {
+// 			// 斷言key為標識符並獲得其名稱
+// 			keyIdent, ok := kvExpr.Key.(*ast.Ident)
+// 			if ok {
+// 				// 在這裡我們將僅處理基本的字面量值，例如字符串或數字
+// 				// 你可能想擴展它以處理更複雜的情況
+// 				switch val := kvExpr.Value.(type) {
+// 				case *ast.BasicLit:
+// 					responseInfo[keyIdent.Name] = val.Value
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return responseInfo
+// }
 
-		// Check for function call
-		callExpr, ok := exprStmt.X.(*ast.CallExpr)
-		if !ok {
-			continue
-		}
+func extractResponseInfo(compLit *ast.CompositeLit) string {
+	var buf bytes.Buffer
+	err := format.Node(&buf, token.NewFileSet(), compLit)
+	if err != nil {
+		return fmt.Sprintf("error formatting node: %v", err)
+	}
+	responseStr := buf.String()
+	responseStr = strings.Replace(responseStr, "gin.H", "", 1)
+	return responseStr
+}
 
-		// Check for "ctx.Param"
-		if selectorExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
-			if selectorExpr.Sel.Name == "Param" {
-				// Extract parameter name
-				if lit, ok := callExpr.Args[0].(*ast.BasicLit); ok {
-					param := lit.Value // This is the parameter name in string form, including quotes
-					apiInfo.Params = append(apiInfo.Params, param)
+func processFuncDecl(funcDecl *ast.FuncDecl, outFile *os.File) {
+	// printer.Fprint(os.Stdout, token.NewFileSet(), funcDecl)
+	currentFuncName := funcDecl.Name.Name // 獲得當前函數名稱
+	ast.Inspect(funcDecl, func(n ast.Node) bool {
+		callExpr, ok := n.(*ast.CallExpr)
+		if ok {
+			selectorExpr, ok := callExpr.Fun.(*ast.SelectorExpr)
+			if ok {
+				// 檢查這是否是一個 "ctx.JSON" 或 "ctx.Param" 調用
+				switch selectorExpr.Sel.Name {
+				case "JSON":
+					// 如果是，你可以從callExpr.Args獲得參數來獲得你需要的信息
+					// ... 你的代碼來處理這個情況
+					if len(callExpr.Args) > 1 {
+						// 提取 HTTP 狀態碼
+						statusCodeExpr := callExpr.Args[0]
+						var statusCode string
+						if basicLit, ok := statusCodeExpr.(*ast.BasicLit); ok {
+							statusCode = basicLit.Value
+						} else {
+							statusCode = "UnknownStatusCode"
+						}
+
+						// 提取 JSON 響應體
+						jsonResponseExpr := callExpr.Args[1]
+						var jsonResponse string
+						if compositeLit, ok := jsonResponseExpr.(*ast.CompositeLit); ok {
+							// TODO: Inspect compositeLit to build a proper JSON string representation
+							// Here, we just print the Go syntax representation as a placeholder
+							jsonResponse = fmt.Sprintf("%+v\n", extractResponseInfo(compositeLit))
+						} else if mapExpr, ok := jsonResponseExpr.(*ast.CallExpr); ok {
+							// TODO: Handle the map expression properly to build the JSON string
+							jsonResponse = fmt.Sprintf("%#v", mapExpr)
+						} else {
+							jsonResponse = "UnknownJSONResponse"
+						}
+
+						if apiInfo, exists := apiMap[currentFuncName]; exists {
+							apiInfo.Responses = append(apiInfo.Responses, fmt.Sprintf("Status code: %s, Response: %s", statusCode, jsonResponse))
+						} else {
+							apiInfo := models.Draft{
+								Responses: []string{fmt.Sprintf("Status code: %s, Response: %s", statusCode, jsonResponse)},
+							}
+							apiMap[currentFuncName] = &apiInfo
+						}
+					}
+				case "Param":
+					if lit, ok := callExpr.Args[0].(*ast.BasicLit); ok {
+						param := lit.Value // This is the parameter name in string form, including quotes
+						if apiInfo, exists := apiMap[currentFuncName]; exists {
+							apiInfo.Params = append(apiInfo.Params, param)
+						} else {
+							apiInfo := models.Draft{
+								Params: []string{param},
+							}
+							apiMap[currentFuncName] = &apiInfo
+						}
+					}
 				}
 			}
-
-			// Check for "ctx.JSON"
-			if selectorExpr.Sel.Name == "JSON" {
-				// TODO: Extract JSON content, you'll probably need to get complex types, not just basic literals
-				apiInfo.Responses = append(apiInfo.Responses, "ExampleJSONResponse")
-			}
 		}
-	}
-	// Write to output file
-	if len(apiInfo.Params) > 0 || len(apiInfo.Responses) > 0 {
-		infoMap[funcDecl.Name.Name] = apiInfo
-		outFile.WriteString("Param:" + strings.Join(apiInfo.Params, ", ") + "\n")
-		outFile.WriteString("Responses:" + strings.Join(apiInfo.Responses, ", ") + "\n")
-		if apiInfo.Method != "" && apiInfo.URL != "" {
-			outFile.WriteString("Method:" + apiInfo.Method + "\n")
-			outFile.WriteString("URL:" + apiInfo.URL + "\n")
-		}
-		outFile.WriteString("\n\n")
-	}
+		return true
+	})
 }
 
 func processFile(filePath string, fset *token.FileSet, outFile *os.File) {
@@ -83,35 +135,29 @@ func processFile(filePath string, fset *token.FileSet, outFile *os.File) {
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch v := n.(type) {
 		case *ast.FuncDecl:
-			apiInfo := APIInfo{}
-			processFuncDecl(v, &apiInfo, outFile)
-			outFile.WriteString("Param:" + strings.Join(apiInfo.Params, ", ") + "\n")
-			outFile.WriteString("Responses:" + strings.Join(apiInfo.Responses, ", ") + "\n")
+			processFuncDecl(v, outFile)
 		case *ast.CallExpr:
 			if selectorExpr, ok := v.Fun.(*ast.SelectorExpr); ok {
 				if _, ok := selectorExpr.X.(*ast.Ident); ok {
 					methodName := selectorExpr.Sel.Name
+					// 從 controller 提取 method & url
 					if methodName == "GET" || methodName == "POST" || methodName == "PUT" || methodName == "DELETE" {
-						// TODO: 從 callExpr.Args 中提取路徑和其他參數
-						// 提取 URL
 						if len(v.Args) > 0 {
 							funcExpr, ok := v.Args[1].(*ast.SelectorExpr)
 							if ok {
 								calledFuncName := funcExpr.Sel.Name
 								urlExpr, ok := v.Args[0].(*ast.BasicLit)
 								if ok {
-									if apiInfo, exists := infoMap[calledFuncName]; exists {
+									if apiInfo, exists := apiMap[calledFuncName]; exists {
 										apiInfo.Method = methodName
 										apiInfo.URL = urlExpr.Value
 									} else {
-										apiInfo := APIInfo{
+										apiInfo := models.Draft{
 											Method: methodName,
 											URL:    urlExpr.Value,
 										}
-										infoMap[calledFuncName] = &apiInfo
+										apiMap[calledFuncName] = &apiInfo
 									}
-									_, err = outFile.WriteString("Method:" + methodName + "\n")
-									_, err = outFile.WriteString("URL:" + urlExpr.Value + "\n")
 								}
 							}
 						}
@@ -141,6 +187,40 @@ func walkDirectory(dir string, fset *token.FileSet, outFile *os.File) {
 	}
 }
 
+func ConvertStructToYaml(target models.Draft) {
+	outFile, err := os.Create("result.yaml")
+	if err != nil {
+		fmt.Println("Error creating yaml file:", err)
+		return
+	}
+	defer outFile.Close()
+
+	b, err := yaml.Marshal(target)
+	if err != nil {
+		fmt.Println("Marshal yaml fail:", err)
+		return
+	}
+	err = ioutil.WriteFile("result.yaml", b, 0644)
+	if err != nil {
+		fmt.Println("Error creating yaml file:", err)
+		return
+	}
+}
+
+func ConvertStructToJson() {
+	jsonData, err := json.MarshalIndent(apiMap, "", "  ")
+	if err != nil {
+		fmt.Println("Error marshalling json:", err)
+		return
+	}
+
+	err = ioutil.WriteFile("drafts.json", jsonData, 0644)
+	if err != nil {
+		fmt.Println("Error writing JSON to file:", err)
+		return
+	}
+}
+
 func main() {
 	fset := token.NewFileSet()
 	rootDir := "../api-service/controllers" // 更換為你的專案根目錄
@@ -156,4 +236,12 @@ func main() {
 
 	walkDirectory(rootDir, fset, outFile)
 	walkDirectory(rootDir2, fset, outFile)
+
+	ConvertStructToJson()
+
+	for k, v := range apiMap {
+		fmt.Println(k, v)
+		// ConvertStructToYaml(*v)
+	}
+
 }
