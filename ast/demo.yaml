@@ -1,127 +1,178 @@
-openapi: 3.0.0
+openapi: "3.0.0"
 info:
   title: Account API
-  version: 1.0.0
+  version: "1.0.0"
+
+servers:
+  - url: /
 
 paths:
-  /:
+  /api/v1/accounts:
     post:
-      summary: Create an account
-      operationId: createAccount
+      summary: Create a new account
       responses:
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '200':
-          description: Successful operation
+          description: Successfully created a new account
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Account'
-  /{username}:
-    delete:
-      summary: Delete an account by username
-      operationId: deleteAccountByUsername
-      parameters:
-      - name: username
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
+                type: object
+                properties:
+                  data:
+                    type: string
+                    example: account
         '400':
-          description: Bad Request
+          description: BindJSON error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: BindJSON error
         '401':
-          description: Unauthorized
+          description: Failed to create account
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Account'
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: create account error
     get:
-      summary: Get an account by username
-      operationId: getAccountByUsername
-      parameters:
-      - name: username
-        in: path
-        required: true
-        schema:
-          type: string
+      summary: Get all accounts
       responses:
+        '200':
+          description: Successfully retrieved accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                    example: accounts
+        '400':
+          description: Failed to get accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: get accounts error
+  /api/v1/accounts/{username}:
+    get:
+      summary: Get account by username
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+                    example: account
+        '400':
+          description: Failed to get account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: get account error
         '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Account'
-    put:
-      summary: Update account by username
-      operationId: updateAccountByUsername
+          description: Account not found
+    delete:
+      summary: Delete an account
       parameters:
-      - name: username
-        in: path
-        required: true
-        schema:
-          type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '200':
-          description: Successful operation
+          description: Successfully deleted account
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Account'
-
-components:
-  schemas:
-    Account:
-      type: object
-      properties:
-        username:
-          type: string
-    Error:
-      type: object
-      properties:
-        error:
-          type: string
+                type: object
+                properties:
+                  data:
+                    type: string
+                    example: account
+        '400':
+          description: BindJSON error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: BindJSON error
+        '401':
+          description: Failed to delete account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: delete account error
+    put:
+      summary: Update an account
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully updated account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+                    example: account
+        '400':
+          description: BindJSON error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: BindJSON error
+        '401':
+          description: Failed to update account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: update account error

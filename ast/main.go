@@ -140,7 +140,7 @@ func processFile(filePath string, fset *token.FileSet, outFile *os.File) {
 			if selectorExpr, ok := v.Fun.(*ast.SelectorExpr); ok {
 				if _, ok := selectorExpr.X.(*ast.Ident); ok {
 					methodName := selectorExpr.Sel.Name
-					// 從 controller 提取 method & url
+					// 從 router 提取 method & url
 					if methodName == "GET" || methodName == "POST" || methodName == "PUT" || methodName == "DELETE" {
 						if len(v.Args) > 0 {
 							funcExpr, ok := v.Args[1].(*ast.SelectorExpr)
@@ -223,8 +223,8 @@ func ConvertStructToJson() {
 
 func main() {
 	fset := token.NewFileSet()
-	rootDir := "../api-service/controllers" // 更換為你的專案根目錄
-	rootDir2 := "../api-service/routers"    // 更換為你的專案根目錄
+	rootDir := "../api-service/controllers"
+	rootDir2 := "../api-service/routers"
 
 	// 創建 txt 文件
 	outFile, err := os.Create("result.txt")
